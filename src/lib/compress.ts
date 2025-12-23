@@ -40,7 +40,7 @@ export async function compressImages(
       };
     }
   }
-  const spinner = ora(`\n${c("Compressing", "dim")}\n`);
+  const spinner = ora(`${c("Compressing", "dim")}\n`);
   spinner.start();
   const errors = [...scan.errors];
   let compressed = 0;
