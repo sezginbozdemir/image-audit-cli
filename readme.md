@@ -12,7 +12,11 @@ A CLI tool to audit and organize image folders. It detects oversized images, dup
 ## Installation
 
 ```bash
-npm install
+npm run build
+```
+
+```bash
+npm install -g .
 ```
 
 ---
