@@ -1,3 +1,4 @@
+import ora from "ora";
 import { compressImages } from "../../lib/compress.js";
 import {
   CompressConfig,
@@ -13,14 +14,20 @@ import {
   printCompressReport,
   printCompressSummary,
 } from "../../utils/report.js";
+import { c } from "../../utils/color.js";
 
 export async function executeCompress(
   compressRules: CompressConfig,
   scan: ScanResult,
   candidates: ImageInfo[],
 ) {
+  const spinner = ora(`${c("Compressing images...", "dim")}\n`);
+
   if (compressRules.yes || compressRules.dryRun) {
-    return await compressImages(compressRules, scan);
+    spinner.start();
+    const result = await compressImages(compressRules, scan);
+    spinner.succeed();
+    return result;
   }
   const ok = await confirm(`Compress/replace ${candidates.length} file(s) ?`);
 
@@ -28,7 +35,10 @@ export async function executeCompress(
     return createCanceledResult(candidates, scan.errors);
   }
 
+  spinner.start();
+
   const result = await compressImages(compressRules, scan);
+  spinner.succeed();
   printCompressSummary(result);
 
   const skipPrompt = compressRules.yes || compressRules.dryRun;

@@ -26,7 +26,7 @@ export async function runScan(
   const spinner = ora(c("Scanning images...", "dim")).start();
   try {
     const result = await scanImages(dir, rules);
-    spinner.succeed(c(`Scan complete (${result.total} file(s))`, "dim"));
+    spinner.succeed(`${c(`Scan complete (${result.total} file(s))`, "dim")}\n`);
     printScanSummary(result);
 
     await generateReports(result, printScanReport, rules.yes);

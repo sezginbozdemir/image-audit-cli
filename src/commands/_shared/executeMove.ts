@@ -1,3 +1,4 @@
+import ora from "ora";
 import { backup } from "../../lib/backup.js";
 import { moveFiles } from "../../lib/move.js";
 import { ScanOpts, ScanResult } from "../../lib/types.js";
@@ -13,6 +14,8 @@ export async function executeMove(
   opts: ScanOpts,
   result: ScanResult,
 ): Promise<void> {
+  const spinner = ora(`${c("Arranging...", "dim")}\n`);
+
   try {
     await backup(dir);
   } catch (err: any) {
@@ -23,6 +26,8 @@ export async function executeMove(
     console.log(c("Aborting arrangement to protect your files.", "cyan"));
     return;
   }
+  spinner.start();
+
   const groups =
     opts.group === "day"
       ? result.dayGroups
@@ -31,6 +36,7 @@ export async function executeMove(
         : result.similiars;
 
   const move = await moveFiles(dir, opts.group, groups);
+  spinner.succeed();
   printMoveSummary(move);
   await generateReports(move, printMoveReport, opts.yes);
 }

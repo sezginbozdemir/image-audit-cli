@@ -1,8 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
 import { FileGroup, GroupType, MoveResult } from "./types.js";
-import ora from "ora";
-import { c } from "../utils/color.js";
 
 export async function moveFiles(
   dir: string,
@@ -13,10 +11,6 @@ export async function moveFiles(
     moved: [],
     failed: [],
   };
-
-  const spinner = ora(`${c("Arranging...", "dim")}\n`);
-
-  spinner.start();
 
   if (type == "duplicate-name") {
     for (const g of groups) {
@@ -37,7 +31,6 @@ export async function moveFiles(
         }
       }
     }
-    spinner.succeed();
   }
 
   if (type == "day") {
@@ -54,7 +47,6 @@ export async function moveFiles(
         }
       }
     }
-    spinner.succeed();
   }
 
   if (type == "similiar") {
@@ -76,7 +68,6 @@ export async function moveFiles(
         }
       }
     }
-    spinner.succeed();
   }
 
   return result;

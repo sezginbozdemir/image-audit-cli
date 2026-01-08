@@ -8,8 +8,6 @@ import {
   FileSkip,
   ScanResult,
 } from "./types.js";
-import ora from "ora";
-import { c } from "../utils/color.js";
 
 export async function compressImages(
   compressRules: CompressConfig,
@@ -19,8 +17,6 @@ export async function compressImages(
   const changed: FileChange[] = [];
   const skipped: FileSkip[] = [];
 
-  const spinner = ora(`${c("Compressing", "dim")}\n`);
-  spinner.start();
   const errors = [...scan.errors];
   let compressed = 0;
   for (const f of candidates) {
@@ -65,7 +61,6 @@ export async function compressImages(
       } catch {}
     }
   }
-  spinner.succeed();
 
   return {
     candidates: candidates.length,

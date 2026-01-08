@@ -4,8 +4,6 @@ import path from "node:path";
 import pLimit from "p-limit";
 import { magickIdentify } from "../tools/magick/identify.js";
 import { ImageInfo, FileError, ScanResult, ScanConfig } from "./types.js";
-import ora from "ora";
-import { c } from "../utils/color.js";
 import {
   findDuplicateFilenames,
   groupByDate,
