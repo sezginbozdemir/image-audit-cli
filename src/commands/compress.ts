@@ -1,14 +1,11 @@
 import { Command } from "commander";
-import { compressImages } from "../lib/compress.js";
-import type {
-  CompressOpts,
-  CompressResult,
-  ScanConfig,
-  CompressConfig,
-} from "../lib/types.js";
-import { confirm } from "../utils/confirm.js";
-import { printCompressReport, printCompressSummary } from "../utils/report.js";
-import { normalizeScanOpts } from "./scan.js";
+import type { CompressOpts, ScanConfig, CompressConfig } from "../lib/types.js";
+import { runScan } from "./_shared/runScan.js";
+import { executeCompress } from "./_shared/executeCompress.js";
+import {
+  normalizeCompressOpts,
+  scanConfigFromOpts,
+} from "./_shared/normalize.js";
 
 export function compress(): Command {
   const cmd = new Command("compress");
@@ -33,33 +30,18 @@ export function compress(): Command {
       false,
     )
     .option("-y, --yes", "Skip confirmation prompt", false)
-    .action(async (dir: string, opts: CompressOpts) => {
-      const scanRules: ScanConfig = normalizeScanOpts(opts);
-      const compressRules: CompressConfig = normalizeCompressOpts(opts);
-
-      const result: CompressResult = await compressImages(
-        dir,
-        scanRules,
-        compressRules,
-      );
-      printCompressSummary(result);
-      const ok = await confirm("Do you want to generate full report?");
-
-      if (ok) printCompressReport(result);
-
-      process.exitCode = result.errors.length ? 2 : 0;
-    });
+    .action(compressAction);
 
   return cmd;
 }
 
-function normalizeCompressOpts(opts: CompressOpts): CompressConfig {
-  return {
-    maxMb: Math.round(Number(opts.maxMb) * 1024 * 1024),
-    quality: Number(opts.quality),
-    pngLevel: Number(opts.pngLevel),
-    extensions: opts.extensions,
-    dryRun: opts.dryRun,
-    yes: opts.yes,
-  };
+async function compressAction(dir: string, opts: CompressOpts): Promise<void> {
+  const scanRules: ScanConfig = scanConfigFromOpts(opts);
+  const compressRules: CompressConfig = normalizeCompressOpts(opts);
+
+  const scan = await runScan(dir, scanRules);
+
+  const result = await executeCompress(compressRules, scan, scan.oversized);
+
+  process.exitCode = result.errors.length ? 2 : 0;
 }

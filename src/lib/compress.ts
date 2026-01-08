@@ -1,45 +1,24 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { confirm } from "../utils/confirm.js";
-import { scanImages } from "./scan.js";
-import { magickCompress } from "../tools/magick.js";
+import { magickCompress } from "../tools/magick/compress.js";
 import {
   CompressConfig,
   CompressResult,
-  ScanConfig,
   FileChange,
   FileSkip,
+  ScanResult,
 } from "./types.js";
 import ora from "ora";
-import { printScanSummary } from "../utils/report.js";
 import { c } from "../utils/color.js";
 
 export async function compressImages(
-  rootDir: string,
-  scanRules: ScanConfig,
   compressRules: CompressConfig,
+  scan: ScanResult,
 ): Promise<CompressResult> {
-  const scan = await scanImages(rootDir, scanRules);
-  printScanSummary(scan);
-  const candidates = scan.tooBig;
+  const candidates = scan.oversized;
   const changed: FileChange[] = [];
   const skipped: FileSkip[] = [];
 
-  if (!compressRules.yes && !compressRules.dryRun) {
-    const ok = await confirm(`Compress/replace ${candidates.length} file(s) ?`);
-
-    if (!ok) {
-      for (const f of candidates)
-        skipped.push({ path: f.path, reason: "canceled" });
-      return {
-        candidates: candidates.length,
-        compressed: 0,
-        skipped,
-        changed: [],
-        errors: scan.errors,
-      };
-    }
-  }
   const spinner = ora(`${c("Compressing", "dim")}\n`);
   spinner.start();
   const errors = [...scan.errors];

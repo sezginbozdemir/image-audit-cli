@@ -19,7 +19,7 @@ export function c(
     return ANSI.bold + ANSI.green + text + ANSI.reset;
   }
   if (style === "cyan") {
-    return ANSI.bold + ANSI.cyan + text + ANSI.reset;
+    return ANSI.cyan + text + ANSI.reset;
   }
   if (style === "dim") {
     return ANSI.dim + text + ANSI.reset;

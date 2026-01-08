@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { scan } from "./commands/scan.js";
 import { compress } from "./commands/compress.js";
+import { move } from "./commands/move.js";
 
 const program = new Command();
 
@@ -13,5 +14,6 @@ program
 
 program.addCommand(scan());
 program.addCommand(compress());
+program.addCommand(move());
 
 program.parseAsync(process.argv);

@@ -8,25 +8,26 @@ export type IdentifyResult = {
   height: number;
   dateOriginal: string | null;
 };
-
+export type GroupType = "duplicate-name" | "day" | "similiar" | "all";
 export type ScanConfig = {
   maxBytes: number;
-  maxWidth: number | null;
-  maxHeight: number | null;
+  group: GroupType | null;
   extensions: string[];
+  yes: boolean;
 };
 
 export type ScanOpts = {
-  maxMb: string;
-  maxW?: string;
-  maxH?: string;
+  maxMb?: string;
+  group: GroupType;
   extensions: string;
+  yes: boolean;
 };
 export type ScanResult = {
   total: number;
-  tooBig: ImageInfo[];
-  duplicates: DuplicateNameGroup[];
-  dayGroups: ImagesByDay[];
+  oversized: ImageInfo[];
+  duplicates: FileGroup[];
+  dayGroups: FileGroup[];
+  similiars: FileGroup[];
   errors: FileError[];
 };
 
@@ -34,9 +35,11 @@ export type ImageInfo = {
   path: string;
   name: string;
   bytes: number;
-  width: number;
-  height: number;
+  mTime: number;
+  width: number | null;
+  height: number | null;
   date: string | null;
+  phash: string | null;
 };
 
 export type CompressTask = {
@@ -53,13 +56,12 @@ export type CompressConfig = {
   pngLevel: number;
   dryRun: boolean;
   yes: boolean;
-  extensions: string;
 };
 
 export type CompressOpts = {
   maxMb: string;
   quality: string;
-  pngLevel: string;
+  level: string;
   dryRun: boolean;
   yes: boolean;
   extensions: string;
@@ -72,13 +74,11 @@ export type CompressResult = {
   errors: FileError[];
 };
 
-export type DuplicateNameGroup = { name: string; paths: string[] };
-
-export type ImagesByDay = { day: string; paths: string[] };
-
 export type FileSkip = { path: string; reason: SkipReason; error?: string };
 
 export type FileError = { path: string; error: string };
+
+export type FileGroup = { name: string; paths: string[] };
 
 export type FileChange = {
   path: string;
@@ -91,4 +91,8 @@ export type SkipReason = "dry-run" | "not-smaller" | "error" | "canceled";
 export type ReportSection = {
   title: string;
   lines: (string | string[])[];
+};
+export type MoveResult = {
+  moved: { from: string; to: string }[];
+  failed: { from: string; to: string; err: any }[];
 };

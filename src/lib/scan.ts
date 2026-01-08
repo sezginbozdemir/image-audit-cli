@@ -2,17 +2,18 @@ import fs from "node:fs/promises";
 import FastGlob from "fast-glob";
 import path from "node:path";
 import pLimit from "p-limit";
-import { magickIdentify } from "../tools/magick.js";
-import {
-  ImagesByDay,
-  DuplicateNameGroup,
-  ImageInfo,
-  FileError,
-  ScanResult,
-  ScanConfig,
-} from "./types.js";
+import { magickIdentify } from "../tools/magick/identify.js";
+import { ImageInfo, FileError, ScanResult, ScanConfig } from "./types.js";
 import ora from "ora";
 import { c } from "../utils/color.js";
+import {
+  findDuplicateFilenames,
+  groupByDate,
+  findSimiliar,
+  findOversized,
+} from "./groups.js";
+import { magickPhash } from "../tools/magick/phash.js";
+import { getCacheEntry, loadCache, saveCache, setCacheEntry } from "./cache.js";
 
 function normalizeExif(exif: string | null): string | null {
   if (exif == null) return null;
@@ -37,9 +38,7 @@ export async function scanImages(
 ): Promise<ScanResult> {
   const patterns = rules.extensions.map((ext) => `**/*.${ext}`);
 
-  console.log(`${c(`Using patterns for fast-glob: ${patterns}`, "cyan")}\n`);
-
-  const entries = await FastGlob(patterns, {
+  const fgOpts = {
     cwd: rootDir,
     onlyFiles: true,
     dot: false,
@@ -47,12 +46,12 @@ export async function scanImages(
     followSymbolicLinks: false,
     absolute: true,
     caseSensitiveMatch: false,
-  });
+  };
 
-  console.log(`${c(`${entries.length} entrie(s) found.`, "cyan")}\n`);
+  const entries = await FastGlob(patterns, fgOpts);
 
-  const spinner = ora(`${c("Gathering metadata... Please wait.", "dim")}\n`);
-  spinner.start();
+  const cache = await loadCache();
+  let cacheDirty = false;
 
   const limit = pLimit(6);
   const errors: FileError[] = [];
@@ -62,16 +61,47 @@ export async function scanImages(
       limit(async (): Promise<ImageInfo | null> => {
         try {
           const st = await fs.stat(file);
-          const { width, height, dateOriginal } = await magickIdentify(file);
-          const date = normalizeExif(dateOriginal);
-          return {
+          const cached = getCacheEntry(cache, file, st.size, st.mtimeMs);
+          let changed = false;
+          let width = cached?.width ?? null;
+          let height = cached?.height ?? null;
+          let date = cached?.date ?? null;
+          let phash = cached?.phash ?? null;
+
+          const wantsIdent = rules.group === "all" || rules.group === "day";
+          const wantsPhash =
+            rules.group === "all" || rules.group === "similiar";
+
+          if (wantsIdent && (width == null || height == null)) {
+            const ident = await magickIdentify(file);
+
+            width = ident.width;
+            height = ident.height;
+            date = normalizeExif(ident.dateOriginal);
+            changed = true;
+          }
+
+          if (wantsPhash && phash == null) {
+            phash = await magickPhash(file);
+            changed = true;
+          }
+
+          const info: ImageInfo = {
             path: file,
             name: path.basename(file),
+            mTime: st.mtimeMs,
             bytes: st.size,
             width,
             height,
             date,
+            phash,
           };
+          if (!cached || changed) {
+            setCacheEntry(cache, file, info);
+            cacheDirty = true;
+          }
+
+          return info;
         } catch (e: any) {
           errors.push({ path: file, error: e?.message ?? String(e) });
           return null;
@@ -80,52 +110,31 @@ export async function scanImages(
     ),
   );
 
+  if (cacheDirty) {
+    await saveCache(cache);
+  }
+
   const okFiles: ImageInfo[] = files.filter((x): x is ImageInfo => x !== null);
+  const duplicates =
+    rules.group === "all" || rules.group === "duplicate-name"
+      ? findDuplicateFilenames(okFiles)
+      : [];
 
-  const tooBig = okFiles.filter((f) => {
-    const sizeTooBig = f.bytes > rules.maxBytes;
-    const tooWide = rules.maxWidth !== null && f.width > rules.maxWidth;
-    const tooTall = rules.maxHeight !== null && f.height > rules.maxHeight;
-    return sizeTooBig || tooWide || tooTall;
-  });
+  const dayGroups =
+    rules.group === "all" || rules.group === "day" ? groupByDate(okFiles) : [];
 
-  const duplicateMap = new Map<string, string[]>();
-  for (const f of okFiles) {
-    const arr = duplicateMap.get(f.name) ?? [];
-    arr.push(f.path);
-    duplicateMap.set(f.name, arr);
-  }
-
-  const duplicates: DuplicateNameGroup[] = [...duplicateMap.entries()]
-    .filter(([_, paths]) => paths.length > 1)
-    .map(([name, paths]) => ({ name, paths: paths.sort() }))
-    .sort(
-      (a, b) => b.paths.length - a.paths.length || a.name.localeCompare(b.name),
-    );
-
-  const dayMap = new Map<string, string[]>();
-
-  for (const f of okFiles) {
-    if (!f.date) continue;
-    const arr = dayMap.get(f.date) ?? [];
-    arr.push(f.path);
-    dayMap.set(f.date, arr);
-  }
-
-  const dayGroups: ImagesByDay[] = [...dayMap.entries()]
-    .filter(([_, paths]) => paths.length > 1)
-    .map(([day, paths]) => ({ day, paths: paths.sort() }))
-    .sort(
-      (a, b) => b.paths.length - a.paths.length || a.day.localeCompare(b.day),
-    );
-
-  spinner.succeed();
+  const similiars =
+    rules.group === "all" || rules.group === "similiar"
+      ? findSimiliar(okFiles)
+      : [];
+  const oversized = findOversized(okFiles, rules);
 
   return {
     total: okFiles.length,
-    tooBig,
+    oversized,
     duplicates,
     dayGroups,
+    similiars,
     errors,
   };
 }

@@ -1,5 +1,11 @@
-import { CompressResult, ReportSection, ScanResult } from "../lib/types.js";
+import {
+  CompressResult,
+  MoveResult,
+  ReportSection,
+  ScanResult,
+} from "../lib/types.js";
 import { c } from "./color.js";
+import { confirm } from "./confirm.js";
 
 function print(summary?: string[], sections?: ReportSection[]): void {
   if (summary) {
@@ -20,8 +26,9 @@ function print(summary?: string[], sections?: ReportSection[]): void {
 export function printScanSummary(result: ScanResult): void {
   const summary = [
     `${c("Scanned:", "ok")} ${c(`${result.total} images`, "cyan")}`,
-    `${c("Too big:", "ok")} ${c(String(result.tooBig.length), "cyan")}`,
+    `${c("Too big:", "ok")} ${c(String(result.oversized.length), "cyan")}`,
     `${c("Duplicate name groups:", "ok")} ${c(String(result.duplicates.length), "cyan")}`,
+    `${c("Similiars:", "ok")} ${c(String(result.similiars.length), "cyan")}`,
     `${c("Day groups:", "ok")} ${c(String(result.dayGroups.length), "cyan")}`,
     ...(result.errors.length
       ? [`${c("Errors:", "error")} ${c(String(result.errors.length), "cyan")}`]
@@ -35,7 +42,7 @@ export function printScanReport(result: ScanResult): void {
   const sections: ReportSection[] = [
     {
       title: "Too big images",
-      lines: result.tooBig.map((f) => [
+      lines: result.oversized.map((f) => [
         `- ${f.path}`,
         `  size=${(f.bytes / 1024 / 1024).toFixed(2)}MB dims=${f.width}x${f.height}`,
       ]),
@@ -50,7 +57,14 @@ export function printScanReport(result: ScanResult): void {
     {
       title: "Day groups",
       lines: result.dayGroups.map((g) => [
-        `- ${g.day} (${g.paths.length})`,
+        `- ${g.name} (${g.paths.length})`,
+        ...g.paths.map((p) => `  ${p}`),
+      ]),
+    },
+    {
+      title: "Similiars",
+      lines: result.similiars.map((g) => [
+        `- ${g.name} (${g.paths.length})`,
         ...g.paths.map((p) => `  ${p}`),
       ]),
     },
@@ -98,4 +112,50 @@ export function printCompressReport(result: CompressResult): void {
   ];
 
   print(undefined, sections);
+}
+export function printMoveSummary(result: MoveResult): void {
+  const summary = [
+    `${c("Moved:", "ok")} ${c(String(result.moved.length), "cyan")}`,
+    ...(result.failed.length
+      ? [`${c("Failed:", "error")} ${c(String(result.failed.length), "cyan")}`]
+      : [`${c("Failed:", "ok")} ${c("0", "dim")}`]),
+  ];
+  print(summary);
+}
+
+export function printMoveReport(result: MoveResult): void {
+  const sections: ReportSection[] = [
+    {
+      title: "Moved files",
+      lines: result.moved.map((m) => [`- ${m.from}`, `  -> ${m.to}`]),
+    },
+    {
+      title: "Failed moves",
+      lines: result.failed.map((f) => [
+        `- ${f.from}`,
+        `  -> ${f.to}`,
+        `  Error: ${f.err?.message || String(f.err)}`,
+      ]),
+    },
+  ];
+  print(undefined, sections);
+}
+
+export async function generateReports<
+  T extends ScanResult | CompressResult | MoveResult,
+>(
+  result: T,
+  printReport: (result: T) => void,
+  skipPrompt: boolean,
+): Promise<void> {
+  if (skipPrompt) {
+    printReport(result);
+    return;
+  }
+
+  const wantsReport = await confirm("Do you want to generate full report?");
+
+  if (wantsReport) {
+    printReport(result);
+  }
 }
